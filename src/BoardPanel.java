@@ -1,111 +1,113 @@
 import javax.swing.*;
 import java.awt.*;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-import java.util.ArrayList;
-import java.awt.event.ActionListener;
-import java.awt.event.ActionEvent;
 
 public class BoardPanel extends JPanel {
-
     private final GameLogic gameLogic;
     private final GameFrame gameFrame;
-    private Timer animationTimer;
+
+    private javax.swing.Timer animationTimer;
     private Stack<Integer> animationPath;
-    private final int ANIMATION_DELAY = 250; // Ditingkatkan dari 180ms ke 250ms
+    private final int ANIMATION_DELAY = 220;
+
+    private Image boardBg, tileImg, tileFinishImg, tileStarImg;
 
     public BoardPanel(GameLogic gameLogic, GameFrame gameFrame) {
         this.gameLogic = gameLogic;
         this.gameFrame = gameFrame;
         setPreferredSize(new Dimension(700, 700));
-        setBackground(Color.WHITE);
-        setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        setOpaque(false);
+        loadImages();
+    }
+
+    private void loadImages() {
+        boardBg = loadScaled("/board/board_bg.png", 700, 700);
+        tileImg = loadRaw("/board/tile.png");
+        tileFinishImg = loadRaw("/board/tile_finish.png");
+        tileStarImg = loadRaw("/board/tile_star.png");
+    }
+
+    private Image loadRaw(String path) {
+        java.net.URL url = getClass().getResource(path);
+        return (url != null) ? new ImageIcon(url).getImage() : null;
+    }
+
+    private Image loadScaled(String path, int w, int h) {
+        java.net.URL url = getClass().getResource(path);
+        return (url != null) ? new ImageIcon(new ImageIcon(url).getImage()
+                .getScaledInstance(w, h, Image.SCALE_SMOOTH)).getImage() : null;
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         int size = 10;
-        int cellSize = getWidth() / size;
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setStroke(new BasicStroke(2));
+        int cellSize = Math.min(getWidth(), getHeight()) / size;
 
+        // background board
+        if (boardBg != null) {
+            g.drawImage(boardBg, 0, 0, getWidth(), getHeight(), null);
+        } else {
+            g.setColor(new Color(210, 230, 255));
+            g.fillRect(0, 0, getWidth(), getHeight());
+        }
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // tiles grid
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
                 int num = getNumberAt(row, col);
                 int x = col * cellSize;
                 int y = (size - 1 - row) * cellSize;
 
-                g.setColor((row + col) % 2 == 0 ? new Color(240, 240, 240) : Color.WHITE);
-                g.fillRect(x, y, cellSize, cellSize);
-                g.setColor(Color.BLACK);
-                g.drawRect(x, y, cellSize, cellSize);
+                Image useTile = tileImg;
+                if (num == 100 && tileFinishImg != null) useTile = tileFinishImg;
+                else if (gameLogic.isStarTile(num) && tileStarImg != null) useTile = tileStarImg;
 
-                g.setFont(new Font("Arial", Font.PLAIN, 12));
-                g.drawString(String.valueOf(num), x + 5, y + 15);
-
-                if (gameLogic.isStarTile(num)) {
-                    g.setColor(new Color(255, 255, 100, 180));
-                    g.fillRect(x, y, cellSize, cellSize);
-
-                    g.setColor(Color.BLUE);
-                    g.setFont(new Font("Arial", Font.BOLD, 14));
-                    FontMetrics fm = g.getFontMetrics();
-                    String text = "STAR";
-                    int textWidth = fm.stringWidth(text);
-                    int textHeight = fm.getAscent();
-                    int tx = x + (cellSize - textWidth) / 2;
-                    int ty = y + (cellSize + textHeight) / 2 - 6;
-                    g.drawString(text, tx, ty);
+                if (useTile != null) {
+                    g2.drawImage(useTile, x, y, cellSize, cellSize, null);
+                } else {
+                    g2.setColor(Color.LIGHT_GRAY);
+                    g2.fillRect(x, y, cellSize, cellSize);
+                    g2.setColor(Color.GRAY);
+                    g2.drawRect(x, y, cellSize, cellSize);
                 }
 
-                if (num == 100) {
-                    g.setColor(Color.RED);
-                    g.setFont(new Font("Arial", Font.BOLD, 14));
-                    FontMetrics fm = g.getFontMetrics();
-                    String text = "FINISH";
-                    int textWidth = fm.stringWidth(text);
-                    int textHeight = fm.getAscent();
-                    int tx = x + (cellSize - textWidth) / 2;
-                    int ty = y + (cellSize + textHeight / 2) / 2;
-                    g.drawString(text, tx, ty);
-                }
+                // tile number overlay
+                g2.setColor(Color.BLACK);
+                g2.setFont(new Font("Arial", Font.PLAIN, 12));
+                g2.drawString(String.valueOf(num), x + 5, y + 15);
             }
         }
 
-        g2.setColor(new Color(0, 150, 255));
-        Map<Integer, Integer> ladders = gameLogic.getLadders();
-        for (Map.Entry<Integer, Integer> e : ladders.entrySet()) {
-            Point p1 = getCellCenter(e.getKey(), cellSize);
-            Point p2 = getCellCenter(e.getValue(), cellSize);
-            g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-        }
-
-        drawAllPlayers(g, cellSize);
+        // players
+        drawAllPlayers(g2, cellSize);
+        g2.dispose();
     }
 
-    private void drawAllPlayers(Graphics g, int cellSize) {
+    private void drawAllPlayers(Graphics2D g, int cellSize) {
         List<GameLogic.Player> players = gameLogic.getPlayers();
-        Color[] colors = { Color.RED, Color.BLUE, Color.GREEN, Color.MAGENTA, Color.ORANGE };
-
         for (int i = 0; i < players.size(); i++) {
             GameLogic.Player p = players.get(i);
             Point pos = getCellCenter(p.position, cellSize);
-            Color playerColor = colors[i % colors.length];
 
-            g.setColor(playerColor);
-            g.fillOval(pos.x - 12, pos.y - 12, 24, 24);
+            Image avatar = loadRaw("/player/p" + (i + 1) + ".png");
+            int tokenSize = Math.max(28, cellSize / 3);
+            Shape circle = new java.awt.geom.Ellipse2D.Float(pos.x - tokenSize / 2f, pos.y - tokenSize / 2f, tokenSize, tokenSize);
+            g.setClip(circle);
+            if (avatar != null) {
+                g.drawImage(avatar, pos.x - tokenSize / 2, pos.y - tokenSize / 2, tokenSize, tokenSize, null);
+            } else {
+                g.setColor(new Color(180, 180, 180));
+                g.fill(circle);
+            }
+            g.setClip(null);
             g.setColor(Color.BLACK);
-            g.drawOval(pos.x - 12, pos.y - 12, 24, 24);
-
-            String initial = String.valueOf(i + 1);
-            g.setColor(Color.WHITE);
-            g.setFont(new Font("Arial", Font.BOLD, 12));
-            FontMetrics fm = g.getFontMetrics();
-            int tx = pos.x - fm.stringWidth(initial) / 2;
-            int ty = pos.y + fm.getAscent() / 2 - 1;
-            g.drawString(initial, tx, ty);
+            g.setStroke(new BasicStroke(2f));
+            g.draw(circle);
         }
     }
 
@@ -113,13 +115,7 @@ public class BoardPanel extends JPanel {
         int size = 10;
         int row = (number - 1) / size;
         int colInRow = (number - 1) % size;
-
-        int col;
-        if (row % 2 == 0)
-            col = colInRow;
-        else
-            col = (size - 1) - colInRow;
-
+        int col = (row % 2 == 0) ? colInRow : (size - 1) - colInRow;
         int x = col * cellSize + cellSize / 2;
         int y = (size - 1 - row) * cellSize + cellSize / 2;
         return new Point(x, y);
@@ -127,41 +123,25 @@ public class BoardPanel extends JPanel {
 
     private int getNumberAt(int row, int col) {
         int size = 10;
-        if (row % 2 == 0)
-            return row * size + (col + 1);
-        else
-            return row * size + (size - col);
+        return (row % 2 == 0) ? row * size + (col + 1) : row * size + (size - col);
     }
 
     public void animateMove(Stack<Integer> path, Runnable onComplete) {
         if (animationTimer != null && animationTimer.isRunning()) return;
-
         animationPath = new Stack<>();
         List<Integer> temp = new ArrayList<>(path);
-
-        for (int i = temp.size() - 1; i > 0; i--) {
-            animationPath.push(temp.get(i));
-        }
+        for (int i = temp.size() - 1; i > 0; i--) animationPath.push(temp.get(i));
 
         GameLogic.Player currentPlayer = gameLogic.getCurrentPlayer();
-
-        animationTimer = new Timer(ANIMATION_DELAY, e -> {
+        animationTimer = new javax.swing.Timer(ANIMATION_DELAY, e -> {
             if (!animationPath.isEmpty()) {
-                int nextPos = animationPath.pop();
-                currentPlayer.position = nextPos;
-
-                gameFrame.playSound("steps.wav");
-
+                currentPlayer.position = animationPath.pop();
                 repaint();
             } else {
-                ((Timer) e.getSource()).stop();
-
-                if (onComplete != null) {
-                    try { onComplete.run(); } catch (Exception ex) { ex.printStackTrace(); }
-                }
+                ((javax.swing.Timer) e.getSource()).stop();
+                if (onComplete != null) onComplete.run();
             }
         });
-
         animationTimer.start();
     }
 }
