@@ -37,10 +37,11 @@ public class GameLogic {
 
         Collections.shuffle(players, rand);
 
-        generateLadders();
         generateStars();
+        generateLadders();
     }
 
+    // ===================== LADDER AWAL =====================
     private void generateLadders() {
         ladders.clear();
         ladders.put(3, 22);
@@ -48,13 +49,6 @@ public class GameLogic {
         ladders.put(28, 55);
         ladders.put(58, 77);
         ladders.put(75, 96);
-        for (Map.Entry<Integer,Integer> e : ladders.entrySet()) {
-            int from = e.getKey();
-            int to = e.getValue();
-            if (from < 1 || from > nodeCount || to < 1 || to > nodeCount) {
-                System.err.println("Invalid ladder mapping: " + from + " -> " + to);
-            }
-        }
     }
 
     private void generateStars() {
@@ -111,109 +105,52 @@ public class GameLogic {
         return dice;
     }
 
+    // ===================== MOVE PLAYER =====================
     public Stack<Integer> moveCurrentPlayer(int dice) {
         Player p = getCurrentPlayer();
-        int startPos = p.position;
-        boolean startOnPrime = isPrime(startPos);
-        int currentPos = startPos;
-
+        int currentPos = p.position;
         Stack<Integer> moves = new Stack<>();
-        moves.push(startPos);
-
-        List<Integer> reversePath = new ArrayList<>();
-
+        moves.push(currentPos);
         p.extraTurns = 0;
 
-        // JALUR PRIMA: Shortest Path + Tangga aktif
-        if (startOnPrime) {
-            List<Integer> path = ShortestPathSolver.getShortestPath(startPos, nodeCount, nodeCount, ladders);
-
-            int steps = Math.min(dice, Math.max(0, path.size() - 1));
-
-            p.stepHistory.clear();
-            p.stepHistory.push(startPos);
-
-            for (int k = 1; k <= steps; k++) {
-                currentPos = path.get(k);
-
+        if (p.greenMove) { // MAJU
+            // lakukan langkah biasa
+            for (int i = 0; i < dice; i++) {
+                currentPos++;
                 if (currentPos > nodeCount) {
                     currentPos = nodeCount;
                     moves.push(currentPos);
                     p.stepHistory.push(currentPos);
                     break;
                 }
-
                 moves.push(currentPos);
                 p.stepHistory.push(currentPos);
+            }
 
-                if (ladders.containsKey(currentPos)) {
-                    currentPos = ladders.get(currentPos);
+            // setelah langkah, cek tangga hanya jika berhenti tepat di dasar tangga
+            if (ladders.containsKey(currentPos)) {
+                currentPos = ladders.get(currentPos);
+                moves.push(currentPos);
+                p.stepHistory.push(currentPos);
+            }
+
+        } else { // MERAH → MUNDUR
+            // mundur sesuai angka dice, minimum posisi = 1, tangga tidak berlaku
+            for (int i = 0; i < dice; i++) {
+                currentPos--;
+                if (currentPos < 1) {
+                    currentPos = 1;
                     moves.push(currentPos);
                     p.stepHistory.push(currentPos);
                     break;
                 }
-            }
-
-            // JALUR NON-PRIMA: Gerak Normal (Tangga TIDAK AKTIF)
-        } else {
-            int dir = p.greenMove ? 1 : -1;
-
-            if (dir == 1) { // MAJU NORMAL
-
-                if (!p.stepHistory.isEmpty()) {
-                    if (p.stepHistory.peek() == startPos) {
-                        p.stepHistory.pop();
-                    }
-                } else {
-                    p.stepHistory.push(startPos);
-                }
-
-
-                for (int k = 1; k <= dice; k++) {
-                    currentPos += dir;
-
-                    if (currentPos < 1) currentPos = 1;
-
-                    if (currentPos > nodeCount) {
-                        currentPos = nodeCount;
-                        moves.push(currentPos);
-                        p.stepHistory.push(currentPos);
-                        break;
-                    }
-
-                    moves.push(currentPos);
-                    p.stepHistory.push(currentPos);
-
-                    // Tangga TIDAK AKTIF di sini
-                }
-            } else { // MUNDUR NORMAL (Berbasis Stack History)
-
-                if (!p.stepHistory.isEmpty() && p.stepHistory.peek() == startPos) {
-                    p.stepHistory.pop();
-                }
-
-                int stepsToPop = Math.min(dice, p.stepHistory.size());
-
-                for (int k = 1; k <= stepsToPop; k++) {
-                    if (!p.stepHistory.isEmpty()) {
-                        int poppedPos = p.stepHistory.pop();
-                        reversePath.add(poppedPos);
-                        currentPos = poppedPos;
-                    } else {
-                        currentPos = 1;
-                        break;
-                    }
-                }
-
+                moves.push(currentPos);
                 p.stepHistory.push(currentPos);
-
-                for (int i = reversePath.size() - 1; i >= 0; i--) {
-                    moves.push(reversePath.get(i));
-                }
             }
         }
 
         p.position = currentPos;
+
         if (isStarTile(p.position)) {
             p.extraTurns = 2;
         }
@@ -223,12 +160,10 @@ public class GameLogic {
 
     public void advanceTurn() {
         Player p = getCurrentPlayer();
-
         if (p.extraTurns > 0) {
             p.extraTurns--;
             return;
         }
-
         currentPlayerIndex = (currentPlayerIndex + 1) % players.size();
     }
 
@@ -239,5 +174,38 @@ public class GameLogic {
         }
         return true;
     }
-}
 
+    // ===================== RESET GAME =====================
+    public void resetGame() {
+        currentPlayerIndex = 0;
+        lastDiceRoll = 0;
+
+        for (Player p : players) {
+            p.position = 1;
+            p.extraTurns = 0;
+            p.greenMove = true;
+            p.stepHistory.clear();
+            p.stepHistory.push(1);
+        }
+
+        regenerateLadders(); // ladder baru setiap game
+    }
+
+    private void regenerateLadders() {
+        ladders.clear();
+        int ladderCount = 5;
+        Set<Integer> used = new HashSet<>();
+
+        while (ladders.size() < ladderCount) {
+            int from = rand.nextInt(nodeCount - 20) + 2;
+            int to = from + rand.nextInt(15) + 5;
+
+            if (to >= nodeCount) continue;
+            if (used.contains(from)) continue;
+            if (starTiles.contains(from)) continue;
+
+            ladders.put(from, to);
+            used.add(from);
+        }
+    }
+}

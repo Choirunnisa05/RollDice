@@ -35,8 +35,10 @@ public class BoardPanel extends JPanel {
 
     private Image loadScaled(String path, int w, int h) {
         java.net.URL url = getClass().getResource(path);
-        return (url != null) ? new ImageIcon(new ImageIcon(url).getImage()
-                .getScaledInstance(w, h, Image.SCALE_SMOOTH)).getImage() : null;
+        return (url != null)
+                ? new ImageIcon(new ImageIcon(url).getImage()
+                .getScaledInstance(w, h, Image.SCALE_SMOOTH)).getImage()
+                : null;
     }
 
     @Override
@@ -45,10 +47,9 @@ public class BoardPanel extends JPanel {
         int size = 10;
         int cellSize = Math.min(getWidth(), getHeight()) / size;
 
-        // background board
-        if (boardBg != null) {
-            g.drawImage(boardBg, 0, 0, getWidth(), getHeight(), null);
-        } else {
+        // background
+        if (boardBg != null) g.drawImage(boardBg, 0, 0, getWidth(), getHeight(), null);
+        else {
             g.setColor(new Color(210, 230, 255));
             g.fillRect(0, 0, getWidth(), getHeight());
         }
@@ -56,7 +57,7 @@ public class BoardPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        // tiles grid
+        // tiles
         for (int row = 0; row < size; row++) {
             for (int col = 0; col < size; col++) {
                 int num = getNumberAt(row, col);
@@ -67,25 +68,70 @@ public class BoardPanel extends JPanel {
                 if (num == 100 && tileFinishImg != null) useTile = tileFinishImg;
                 else if (gameLogic.isStarTile(num) && tileStarImg != null) useTile = tileStarImg;
 
-                if (useTile != null) {
-                    g2.drawImage(useTile, x, y, cellSize, cellSize, null);
-                } else {
+                if (useTile != null) g2.drawImage(useTile, x, y, cellSize, cellSize, null);
+                else {
                     g2.setColor(Color.LIGHT_GRAY);
                     g2.fillRect(x, y, cellSize, cellSize);
                     g2.setColor(Color.GRAY);
                     g2.drawRect(x, y, cellSize, cellSize);
                 }
 
-                // tile number overlay
                 g2.setColor(Color.BLACK);
                 g2.setFont(new Font("Arial", Font.PLAIN, 12));
                 g2.drawString(String.valueOf(num), x + 5, y + 15);
             }
         }
 
+        // ladders
+        drawLadders(g2, cellSize);
+
         // players
         drawAllPlayers(g2, cellSize);
         g2.dispose();
+    }
+
+    private void drawLadders(Graphics2D g2, int cellSize) {
+        Map<Integer, Integer> ladders = gameLogic.getLadders();
+        for (Map.Entry<Integer, Integer> e : ladders.entrySet()) {
+            Point start = getCellCenter(e.getKey(), cellSize);
+            Point end = getCellCenter(e.getValue(), cellSize);
+            drawSingleLadder(g2, start, end);
+        }
+    }
+
+    private void drawSingleLadder(Graphics2D g2, Point start, Point end) {
+        double dx = end.x - start.x;
+        double dy = end.y - start.y;
+        double length = Math.sqrt(dx * dx + dy * dy);
+        double ux = dx / length;
+        double uy = dy / length;
+        double px = -uy;
+        double py = ux;
+
+        int halfWidth = 10;
+        int rungCount = (int) (length / 22);
+
+        g2.setStroke(new BasicStroke(6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2.setColor(new Color(0, 0, 0, 70));
+        g2.drawLine((int) (start.x + px * halfWidth + 2), (int) (start.y + py * halfWidth + 2),
+                (int) (end.x + px * halfWidth + 2), (int) (end.y + py * halfWidth + 2));
+        g2.drawLine((int) (start.x - px * halfWidth + 2), (int) (start.y - py * halfWidth + 2),
+                (int) (end.x - px * halfWidth + 2), (int) (end.y - py * halfWidth + 2));
+
+        g2.setColor(new Color(156, 93, 59));
+        g2.drawLine((int) (start.x + px * halfWidth), (int) (start.y + py * halfWidth),
+                (int) (end.x + px * halfWidth), (int) (end.y + py * halfWidth));
+        g2.drawLine((int) (start.x - px * halfWidth), (int) (start.y - py * halfWidth),
+                (int) (end.x - px * halfWidth), (int) (end.y - py * halfWidth));
+
+        g2.setStroke(new BasicStroke(4f));
+        for (int i = 1; i < rungCount; i++) {
+            double t = (double) i / rungCount;
+            int cx = (int) (start.x + dx * t);
+            int cy = (int) (start.y + dy * t);
+            g2.drawLine((int) (cx + px * halfWidth), (int) (cy + py * halfWidth),
+                    (int) (cx - px * halfWidth), (int) (cy - py * halfWidth));
+        }
     }
 
     private void drawAllPlayers(Graphics2D g, int cellSize) {
@@ -96,12 +142,17 @@ public class BoardPanel extends JPanel {
 
             Image avatar = loadRaw("/player/p" + (i + 1) + ".png");
             int tokenSize = Math.max(28, cellSize / 3);
-            Shape circle = new java.awt.geom.Ellipse2D.Float(pos.x - tokenSize / 2f, pos.y - tokenSize / 2f, tokenSize, tokenSize);
+            Shape circle = new java.awt.geom.Ellipse2D.Float(
+                    pos.x - tokenSize / 2f,
+                    pos.y - tokenSize / 2f,
+                    tokenSize,
+                    tokenSize
+            );
+
             g.setClip(circle);
-            if (avatar != null) {
-                g.drawImage(avatar, pos.x - tokenSize / 2, pos.y - tokenSize / 2, tokenSize, tokenSize, null);
-            } else {
-                g.setColor(new Color(180, 180, 180));
+            if (avatar != null) g.drawImage(avatar, pos.x - tokenSize / 2, pos.y - tokenSize / 2, tokenSize, tokenSize, null);
+            else {
+                g.setColor(Color.GRAY);
                 g.fill(circle);
             }
             g.setClip(null);
@@ -123,11 +174,14 @@ public class BoardPanel extends JPanel {
 
     private int getNumberAt(int row, int col) {
         int size = 10;
-        return (row % 2 == 0) ? row * size + (col + 1) : row * size + (size - col);
+        return (row % 2 == 0)
+                ? row * size + (col + 1)
+                : row * size + (size - col);
     }
 
     public void animateMove(Stack<Integer> path, Runnable onComplete) {
         if (animationTimer != null && animationTimer.isRunning()) return;
+
         animationPath = new Stack<>();
         List<Integer> temp = new ArrayList<>(path);
         for (int i = temp.size() - 1; i > 0; i--) animationPath.push(temp.get(i));

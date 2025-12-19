@@ -1,6 +1,8 @@
 import javax.swing.*;
+import javax.sound.sampled.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.net.URL;
 import java.util.*;
 import java.util.List;
@@ -20,6 +22,8 @@ public class GameFrame extends JFrame {
     private final ImageIcon[] diceRed = new ImageIcon[7];
     private Image panelRightBg, panelLeftBg, leaderboardBg;
 
+    private final int ANIMATION_DELAY = 220; // untuk suara step
+
     public GameFrame() {
         int numPlayers = askPlayerCount();
         List<String> names = askPlayerNames(numPlayers);
@@ -33,7 +37,7 @@ public class GameFrame extends JFrame {
 
         loadUiImages();
 
-        // Left background panel
+        // Left panel
         JPanel leftPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -48,7 +52,7 @@ public class GameFrame extends JFrame {
         boardPanel = new BoardPanel(game, this);
         add(boardPanel, BorderLayout.CENTER);
 
-        // Right UI panel
+        // Right panel
         JPanel rightPanel = new JPanel(new BorderLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -59,12 +63,12 @@ public class GameFrame extends JFrame {
         rightPanel.setPreferredSize(new Dimension(280, 750));
         add(rightPanel, BorderLayout.EAST);
 
-        // Top: "its your turn"
+        // Turn label
         turnLabel = new JLabel("its your turn", SwingConstants.CENTER);
         turnLabel.setFont(new Font("Arial", Font.BOLD, 24));
         rightPanel.add(turnLabel, BorderLayout.NORTH);
 
-        // Center stack: profile circle, dice, leaderboard
+        // Center stack
         JPanel centerStack = new JPanel();
         centerStack.setOpaque(false);
         centerStack.setLayout(new BoxLayout(centerStack, BoxLayout.Y_AXIS));
@@ -96,7 +100,7 @@ public class GameFrame extends JFrame {
 
         rightPanel.add(centerStack, BorderLayout.CENTER);
 
-        // Bottom: roll button + start new game
+        // Bottom buttons
         JPanel bottomButtons = new JPanel(new GridLayout(2, 1, 10, 10));
         bottomButtons.setOpaque(false);
 
@@ -107,17 +111,17 @@ public class GameFrame extends JFrame {
         startNewGameButton = new JButton("START NEW GAME");
         startNewGameButton.setFont(new Font("Arial", Font.BOLD, 16));
         startNewGameButton.addActionListener(e -> {
+            game.resetGame();
+            rollButton.setEnabled(true);
             updateAllUI();
         });
         bottomButtons.add(startNewGameButton);
 
         rightPanel.add(bottomButtons, BorderLayout.SOUTH);
 
-        // Load dice icons after diceLabel exists
         loadDiceIcons();
         diceLabel.setIcon(diceGreen[1] != null ? diceGreen[1] : new ImageIcon(createPlaceholderImage(100, 100, "1")));
 
-        // Initial UI
         updateAllUI();
 
         setVisible(true);
@@ -173,17 +177,12 @@ public class GameFrame extends JFrame {
         GameLogic.Player cp = game.getCurrentPlayer();
         turnLabel.setText("its your turn: " + cp.name);
 
-        // Avatar berdasarkan indeks pemain aktif (tanpa mengubah GameLogic)
         int avatarIndex = game.getCurrentPlayerIndex() + 1;
         Image avatar = loadImage("/player/p" + avatarIndex + ".png");
         int size = 120;
-        if (avatar != null) {
-            profileCircle.setIcon(new ImageIcon(toCircular(avatar, size, size)));
-        } else {
-            profileCircle.setIcon(new ImageIcon(createPlaceholderImage(size, size, "P" + avatarIndex)));
-        }
+        if (avatar != null) profileCircle.setIcon(new ImageIcon(toCircular(avatar, size, size)));
+        else profileCircle.setIcon(new ImageIcon(createPlaceholderImage(size, size, "P" + avatarIndex)));
 
-        // Set dice default sesuai arah gerak
         ImageIcon[] set = cp.greenMove ? diceGreen : diceRed;
         diceLabel.setIcon(set[1] != null ? set[1] : new ImageIcon(createPlaceholderImage(100, 100, "1")));
     }
@@ -236,18 +235,12 @@ public class GameFrame extends JFrame {
 
         rollTimer.addActionListener(e -> {
             if (rolls[0] < totalRolls) {
-                int randomRoll = 1 + new Random().nextInt(6);
-                ImageIcon icon = set[randomRoll] != null
-                        ? set[randomRoll]
-                        : new ImageIcon(createPlaceholderImage(100, 100, String.valueOf(randomRoll)));
-                diceLabel.setIcon(icon);
+                int val = (int) (Math.random() * 6) + 1;
+                diceLabel.setIcon(set[val]);
                 rolls[0]++;
             } else {
                 ((javax.swing.Timer) e.getSource()).stop();
-                ImageIcon icon = set[finalResult] != null
-                        ? set[finalResult]
-                        : new ImageIcon(createPlaceholderImage(100, 100, String.valueOf(finalResult)));
-                diceLabel.setIcon(icon);
+                diceLabel.setIcon(set[finalResult]);
                 if (onComplete != null) onComplete.run();
             }
         });
@@ -258,18 +251,38 @@ public class GameFrame extends JFrame {
         rollButton.setEnabled(false);
         GameLogic.Player cp = game.getCurrentPlayer();
         int dice = game.rollDice();
-        boolean green = cp.greenMove;
 
-        animateDiceRoll(green, dice, () -> {
+        playSound("roll_dice.wav");
+
+        animateDiceRoll(cp.greenMove, dice, () -> {
             Stack<Integer> movePath = game.moveCurrentPlayer(dice);
+            new Thread(() -> playStepSounds(movePath.size())).start();
             boardPanel.animateMove(movePath, this::endTurnCheck);
         });
     }
 
+    private void playStepSounds(int stepCount) {
+        for (int i = 0; i < stepCount; i++) {
+            playSound("steps.wav");
+            try { Thread.sleep(ANIMATION_DELAY); } catch (InterruptedException ignored) {}
+        }
+    }
+
+    private void playSound(String filename) {
+        try {
+            URL url = getClass().getResource("/sounds/" + filename);
+            if (url == null) return;
+            AudioInputStream audioIn = AudioSystem.getAudioInputStream(url);
+            Clip clip = AudioSystem.getClip();
+            clip.open(audioIn);
+            clip.start();
+        } catch (UnsupportedAudioFileException | IOException | LineUnavailableException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void endTurnCheck() {
         GameLogic.Player cp = game.getCurrentPlayer();
-
-        // Finish: record win, update leaderboard, dialog, lalu (opsional) disable roll
         if (cp.position >= game.getNodeCount()) {
             game.recordWin(cp.name);
             updateLeaderboardPanel();
@@ -278,7 +291,6 @@ public class GameFrame extends JFrame {
             return;
         }
 
-        // Advance turn & refresh header/dice/avatar
         game.advanceTurn();
         updateAllUI();
         rollButton.setEnabled(true);
@@ -308,7 +320,7 @@ public class GameFrame extends JFrame {
         return names;
     }
 
-    private Image createPlaceholderImage(int width, int height, String text) {
+    private BufferedImage createPlaceholderImage(int width, int height, String text) {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         g.setColor(Color.LIGHT_GRAY);
