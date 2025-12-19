@@ -8,11 +8,10 @@ public class GameLogic {
         public int position = 1;
         public boolean greenMove;
         public int extraTurns = 0;
-        public Stack<Integer> stepHistory = new Stack<>();
+        public boolean lastMovePrime = false;
 
         public Player(String name) {
             this.name = name;
-            this.stepHistory.push(1);
         }
     }
 
@@ -41,7 +40,7 @@ public class GameLogic {
         generateLadders();
     }
 
-    // ===================== LADDER AWAL =====================
+    // ===================== LADDER & STAR =====================
     private void generateLadders() {
         ladders.clear();
         ladders.put(3, 22);
@@ -111,49 +110,47 @@ public class GameLogic {
         int currentPos = p.position;
         Stack<Integer> moves = new Stack<>();
         moves.push(currentPos);
-        p.extraTurns = 0;
 
+        // ===================== MAJU / MUNDUR =====================
         if (p.greenMove) { // MAJU
-            // lakukan langkah biasa
             for (int i = 0; i < dice; i++) {
                 currentPos++;
                 if (currentPos > nodeCount) {
                     currentPos = nodeCount;
                     moves.push(currentPos);
-                    p.stepHistory.push(currentPos);
                     break;
                 }
                 moves.push(currentPos);
-                p.stepHistory.push(currentPos);
             }
 
-            // setelah langkah, cek tangga hanya jika berhenti tepat di dasar tangga
+            // Naik tangga jika berhenti tepat di bawahnya
             if (ladders.containsKey(currentPos)) {
                 currentPos = ladders.get(currentPos);
                 moves.push(currentPos);
-                p.stepHistory.push(currentPos);
             }
 
         } else { // MERAH → MUNDUR
-            // mundur sesuai angka dice, minimum posisi = 1, tangga tidak berlaku
             for (int i = 0; i < dice; i++) {
                 currentPos--;
                 if (currentPos < 1) {
                     currentPos = 1;
                     moves.push(currentPos);
-                    p.stepHistory.push(currentPos);
                     break;
                 }
                 moves.push(currentPos);
-                p.stepHistory.push(currentPos);
             }
+            // Tidak naik tangga saat mundur
         }
 
         p.position = currentPos;
 
+        // cek star tile
         if (isStarTile(p.position)) {
             p.extraTurns = 2;
         }
+
+        // cek prime untuk giliran berikutnya
+        p.lastMovePrime = isPrime(p.position);
 
         return moves;
     }
@@ -184,11 +181,10 @@ public class GameLogic {
             p.position = 1;
             p.extraTurns = 0;
             p.greenMove = true;
-            p.stepHistory.clear();
-            p.stepHistory.push(1);
+            p.lastMovePrime = false;
         }
 
-        regenerateLadders(); // ladder baru setiap game
+        regenerateLadders();
     }
 
     private void regenerateLadders() {
