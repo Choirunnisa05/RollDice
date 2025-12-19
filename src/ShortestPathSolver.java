@@ -14,12 +14,10 @@ public class ShortestPathSolver {
 
             List<Integer> neighbors = new ArrayList<>();
 
-            // Pilihan 1: Maju satu langkah
             if (cur + 1 <= nodeCount) {
                 neighbors.add(cur + 1);
             }
 
-            // Pilihan 2: Loncatan Tangga (diperlukan untuk Shortest Path)
             if (ladders.containsKey(cur)) {
                 neighbors.add(ladders.get(cur));
             }
@@ -32,7 +30,6 @@ public class ShortestPathSolver {
             }
         }
 
-        // Rekonstruksi Jalur (Path Reconstruction)
         List<Integer> path = new ArrayList<>();
         Integer cur = goal;
         while (cur != null) {
