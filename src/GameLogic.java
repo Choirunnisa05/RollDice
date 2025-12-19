@@ -40,7 +40,7 @@ public class GameLogic {
         generateLadders();
     }
 
-    // ===================== LADDER & STAR =====================
+    // LADDER & STAR
     private void generateLadders() {
         ladders.clear();
         ladders.put(3, 22);
@@ -104,15 +104,14 @@ public class GameLogic {
         return dice;
     }
 
-    // ===================== MOVE PLAYER =====================
+    // MOVE PLAYER
     public Stack<Integer> moveCurrentPlayer(int dice) {
         Player p = getCurrentPlayer();
         int currentPos = p.position;
         Stack<Integer> moves = new Stack<>();
         moves.push(currentPos);
 
-        // ===================== MAJU / MUNDUR =====================
-        if (p.greenMove) { // MAJU
+        if (p.greenMove) {
             for (int i = 0; i < dice; i++) {
                 currentPos++;
                 if (currentPos > nodeCount) {
@@ -123,13 +122,12 @@ public class GameLogic {
                 moves.push(currentPos);
             }
 
-            // Naik tangga jika berhenti tepat di bawahnya
             if (ladders.containsKey(currentPos)) {
                 currentPos = ladders.get(currentPos);
                 moves.push(currentPos);
             }
 
-        } else { // MERAH → MUNDUR
+        } else {
             for (int i = 0; i < dice; i++) {
                 currentPos--;
                 if (currentPos < 1) {
@@ -139,17 +137,14 @@ public class GameLogic {
                 }
                 moves.push(currentPos);
             }
-            // Tidak naik tangga saat mundur
         }
 
         p.position = currentPos;
 
-        // cek star tile
         if (isStarTile(p.position)) {
             p.extraTurns = 2;
         }
 
-        // cek prime untuk giliran berikutnya
         p.lastMovePrime = isPrime(p.position);
 
         return moves;
@@ -172,7 +167,7 @@ public class GameLogic {
         return true;
     }
 
-    // ===================== RESET GAME =====================
+    // RESET GAME
     public void resetGame() {
         currentPlayerIndex = 0;
         lastDiceRoll = 0;

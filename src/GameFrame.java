@@ -37,7 +37,6 @@ public class GameFrame extends JFrame {
 
         loadUiImages();
 
-        // Left panel
         JPanel leftPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -48,11 +47,9 @@ public class GameFrame extends JFrame {
         leftPanel.setPreferredSize(new Dimension(220, 750));
         add(leftPanel, BorderLayout.WEST);
 
-        // Center board
         boardPanel = new BoardPanel(game, this);
         add(boardPanel, BorderLayout.CENTER);
 
-        // Right panel
         JPanel rightPanel = new JPanel(new BorderLayout()) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -63,12 +60,10 @@ public class GameFrame extends JFrame {
         rightPanel.setPreferredSize(new Dimension(280, 750));
         add(rightPanel, BorderLayout.EAST);
 
-        // Turn label
         turnLabel = new JLabel("its your turn", SwingConstants.CENTER);
         turnLabel.setFont(new Font("Arial", Font.BOLD, 24));
         rightPanel.add(turnLabel, BorderLayout.NORTH);
 
-        // Center stack
         JPanel centerStack = new JPanel();
         centerStack.setOpaque(false);
         centerStack.setLayout(new BoxLayout(centerStack, BoxLayout.Y_AXIS));
@@ -100,7 +95,6 @@ public class GameFrame extends JFrame {
 
         rightPanel.add(centerStack, BorderLayout.CENTER);
 
-        // Bottom buttons
         JPanel bottomButtons = new JPanel(new GridLayout(2, 1, 10, 10));
         bottomButtons.setOpaque(false);
 
